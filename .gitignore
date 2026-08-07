@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+settings.json
+参考项目/
+.claude/
+.idea/
+*.iml
+ELECTRON_MIGRATION.md

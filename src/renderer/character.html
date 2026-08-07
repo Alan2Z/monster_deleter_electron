@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self' file: data: blob:; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; script-src 'self'">
+<title>召唤怪兽摧毁文件</title>
+<style>
+  :root { --bg: #f2f2f7; --accent: #ff9500; --blue: #007aff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    padding: 24px 36px;
+  }
+  .title-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .title-row h1 { margin: 0; font-size: 26px; font-weight: 700; color: #1c1c1e; }
+  #custom-btn {
+    padding: 8px 18px; font-size: 14px; font-weight: 600;
+    border: none; border-radius: 12px; background: #ff7a00; color: #fff; cursor: pointer;
+    white-space: nowrap;
+  }
+  #custom-btn:hover { background: #ff9500; }
+  .hint { margin: 0 0 12px; color: #6c6c70; font-size: 13px; }
+  #status { min-height: 18px; margin: 0 0 12px; color: #007aff; font-size: 14px; font-weight: 600; }
+  #cards {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    max-height: 400px; overflow-y: auto;
+  }
+  .card {
+    background: #fff; border: 3px solid transparent; border-radius: 18px;
+    padding: 14px 20px; cursor: pointer; text-align: center;
+    transition: border-color .15s;
+    min-width: 270px; min-height: 170px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .card:hover { border-color: var(--blue); }
+  .card.selected { border-color: var(--accent); background: #fff4d6; }
+  .card img { height: 110px; pointer-events: none; }
+  .card .name { font-size: 16px; font-weight: 600; margin-top: 8px; }
+  .card .desc { font-size: 12px; color: #6c6c70; margin-top: 2px; }
+  #empty { display: none; padding: 40px; text-align: center; color: #888; }
+  #random {
+    display: block; margin: 18px auto 0;
+    padding: 10px 30px; font-size: 16px; font-weight: 600;
+    border: none; border-radius: 18px; background: #ff7a00; color: #fff; cursor: pointer;
+  }
+  #random:hover { background: #ff9500; }
+  #ctx-menu {
+    position: fixed; display: none; z-index: 100;
+    background: #fff; border: 1px solid #e5e5ea; border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .15); padding: 4px; min-width: 170px;
+    font-size: 14px;
+  }
+  #ctx-menu div { padding: 8px 14px; border-radius: 7px; cursor: pointer; }
+  #ctx-menu div:hover { background: #f2f2f7; }
+  #config-modal {
+    position: fixed; inset: 0; display: none; z-index: 200;
+    background: rgba(0, 0, 0, .4); align-items: center; justify-content: center;
+  }
+  #config-modal .modal-box {
+    background: #fff; border-radius: 14px; width: 720px; max-width: 92vw;
+    height: min(84vh, 720px); display: flex; flex-direction: column; overflow: hidden;
+  }
+  #config-modal .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; border-bottom: 1px solid #e5e5ea; font-weight: 600;
+  }
+  #modal-close {
+    border: none; background: #f2f2f7; border-radius: 8px;
+    width: 28px; height: 28px; cursor: pointer; font-size: 14px;
+  }
+  #config-editor { display: none; }
+  #config-modal .CodeMirror {
+    flex: 1 1 0; min-height: 0;   /* basis=0:高度由 flex 分配并允许收缩,编辑器内部滚动 */
+    height: auto;
+    font-size: 13px;
+  }
+  .modal-foot {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 18px; border-top: 1px solid #e5e5ea;
+  }
+  #config-err { flex: 1; font-size: 13px; color: #d70015; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #config-save {
+    padding: 8px 22px; font-size: 14px; font-weight: 600;
+    border: none; border-radius: 10px; background: #ff7a00; color: #fff; cursor: pointer;
+  }
+  #config-save:hover { background: #ff9500; }
+</style>
+</head>
+<body>
+  <div class="title-row">
+    <h1>选择你的怪兽</h1>
+    <button id="custom-btn">📖 自定义角色</button>
+  </div>
+  <p class="hint">双击 exe 启动时在此切换默认角色;右键菜单召唤怪兽时,将自动使用下方高亮的角色。</p>
+  <p id="status"></p>
+  <div id="cards"></div>
+  <div id="empty">assets 文件夹里没有找到角色素材,请把怪兽文件夹放进去后重启。</div>
+  <button id="random">🎲 随机一只</button>
+
+  <div id="ctx-menu">
+    <div id="ctx-edit-config">📝 编辑配置文件</div>
+  </div>
+
+  <div id="config-modal">
+    <div class="modal-box">
+      <div class="modal-head"><span id="modal-title">编辑配置文件</span><button id="modal-close">✕</button></div>
+      <textarea id="config-editor"></textarea>
+      <div class="modal-foot">
+        <span id="config-err"></span>
+        <button id="config-save">💾 保存</button>
+      </div>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href="vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="vendor/codemirror/monokai.css">
+  <script src="vendor/codemirror/codemirror.js"></script>
+  <script src="vendor/codemirror/javascript.js"></script>
+
+  <script src="character.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self' file: data: blob:; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: blob:; script-src 'self'">
+<title>召唤怪兽摧毁文件</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: transparent; user-select: none;
+  }
+  canvas { position: absolute; left: 0; top: 0; }
+  #monster, #explosion { pointer-events: none; }
+  #bubble {   /* 对话气泡:白底圆角 + 指向怪兽的尾巴,同原版 BubbleWidget */
+    position: absolute; display: none;
+    padding: 15px 30px 20px;
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 20px;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: 20px; font-weight: 600; color: #1c1c1e;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+    white-space: nowrap;
+  }
+  #bubble::after {
+    content: ''; position: absolute; left: 50%; bottom: -12px;
+    width: 0; height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 12px solid rgba(255, 255, 255, 0.94);
+    transform: translateX(-50%);
+  }
+  #choices {
+    position: absolute; left: 0; top: 0; display: none; gap: 15px;
+  }
+  #choices button {
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: 16px; font-weight: 600; color: #1c1c1e;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #e5e5ea; border-radius: 18px;
+    padding: 12px 25px; cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
+  }
+  #choices button:hover { background: #007aff; color: #ffffff; border-color: #007aff; }
+  #msg {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    display: none; color: #fff; font-size: 18px; text-shadow: 0 1px 3px #000;
+  }
+</style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <canvas id="monster"></canvas>
+  <canvas id="explosion"></canvas>
+  <div id="bubble"></div>
+  <div id="choices">
+    <button id="btn-yes"></button>
+    <button id="btn-no"></button>
+    <button id="btn-swap">换一只</button>
+  </div>
+  <div id="msg">缺少素材,请检查 assets 文件夹(Esc 退出)</div>
+  <audio id="bgm" loop></audio>
+  <audio id="sfx"></audio>
+  <audio id="boom"></audio>
+  <script src="show.js"></script>
+</body>
+</html>

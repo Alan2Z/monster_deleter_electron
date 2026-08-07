@@ -1,0 +1,58 @@
+// 自定义怪兽配置模板(JSONC:支持 // 行注释和 /* */ 块注释,字符串里的保留)
+// 用法:复制本文件到你的怪兽文件夹里,改成你想要的值即可。
+// 说明:每个字段都可以省略,省略的字段自动继承代码内置的默认值;
+//       文件名是相对本文件夹的路径,找不到会依次回退到 dajiang_monster 和 assets 根。
+
+{
+  "id": "green_monster",                  // 唯一标识:改文件夹名也不影响已保存的默认角色
+  "name": "大将怪兽",                      // 显示名(角色卡片/状态栏),缺省用文件夹名
+  "description": "绿皮大将，嚣张登场",       // 角色卡上的介绍文字
+
+  // ---------- 贴图(文件名相对本文件夹;5列×3行 spritesheet) ----------
+  "sprites": {
+    "walk": "走路动效_spritesheet_transparent.png",   // 走路动画
+    "point": "指着文件_spritesheet_transparent.png",  // 指点动画
+    "kick": "踹文件动效_spritesheet_transparent.png", // 踢踹动画
+    "explosion": "爆炸_spritesheet_transparent.png",  // 爆炸动画
+    "leo": "雷欧登场_spritesheet_transparent.png",     // 登场动画
+    "fly": "出场飞行动效_spritesheet_transparent.png", // 飞离动画
+    "point_frames": [11, 12, 13, 14]                  // 指点动画取哪些帧(0起;默认第3行第2~5格)
+  },
+
+  // ---------- 音频(文件名相对本文件夹;找不到用 assets/audio/ 默认) ----------
+  "audio": {
+    "bgm": "audio/bgm(1).mp3",    // 背景乐(循环播放)
+    "voice": "audio/怪兽说话.mp3", // 指点文件时的音效
+    "explosion": "audio/爆炸.MP4"  // 爆炸音效
+  },
+
+  // ---------- 文案(演出里显示的所有文字) ----------
+  "texts": {
+    "targeting": "请选择你要摧毁的文件",  // 狙击瞄准时的提示文字
+    "dialog": "喂，是这个吗？",           // 对话气泡
+    "choice_yes": "是的",                 // 确认按钮
+    "choice_no": "嘤嘤嘤就是这个",        // 再挑一个按钮
+    "swap": "换一只"                      // 换怪兽按钮
+  },
+
+  // ---------- 动画参数 ----------
+  "animation": {
+    "fps": 8,                  // 动画帧率
+    "sprite_height": 250,      // 怪兽显示高度(像素)
+    "walk_duration_ms": 4500,  // 走路入场时长(毫秒)
+    "explosion_height": 150,   // 爆炸图显示高度(像素)
+    "walk_y_offset": 50,       // 走路时怪兽相对目标点的垂直偏移(像素,正=偏下)
+    "target_gap": 30,          // 怪兽手指与目标文件的水平间距(像素,越小越贴近)
+    "kick_frame": 5,           // 踢踹动画第几帧触发爆炸(0 起,默认 5=第 6 帧)
+    "fly_duration_ms": 2000,   // 飞离动画时长(毫秒)
+    "explosion_y_offset": 40   // 爆炸图相对目标点上移量(像素)
+  },
+
+  // ---------- 染色变体 ----------
+  // strength: 0 = 不变色, 1 = 完全染成目标色;配合透明底贴图效果最好。
+  // 只写这一段、不复制任何图片,就是一只回退用大将素材的"换皮怪兽"。
+  "tint": {
+    "color": "#ffffff",   // 染色颜色(十六进制)
+    "strength": 0         // 染色强度(0~1)
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "monster-deleter",
+  "version": "1.0.0",
+  "description": "大将怪兽摧毁(Electron 版)",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "author": "Strive",
+  "license": "MIT",
+  "devDependencies": {
+    "codemirror": "^5.65.21",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
+  }
+}

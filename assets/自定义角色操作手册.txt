@@ -1,0 +1,157 @@
+========================================
+  MonsterDeleter 自定义角色操作手册
+  (assets 目录)
+========================================
+
+一、目录结构
+------------
+
+assets/
+├── dajiang_monster/       # 一个怪兽 = 一个文件夹
+│   ├── 走路动效_spritesheet_transparent.png
+│   ├── 指着文件_spritesheet_transparent.png
+│   ├── 踹文件动效_spritesheet_transparent.png
+│   ├── 爆炸_spritesheet_transparent.png
+│   ├── 雷欧登场_spritesheet_transparent.png
+│   ├── 出场飞行动效_spritesheet_transparent.png
+│   ├── audio/             # 本怪兽的音频(可选,缺省用 assets/audio/ 兜底)
+│   │   ├── bgm(1).mp3
+│   │   ├── 怪兽说话.mp3
+│   │   └── 爆炸.MP4
+│   └── config.jsonc       # 完整配置模板:带注释,所有字段说明都在里面,复制改名即可用
+└── audio/                 # 公共默认音频(所有怪兽的兜底)
+
+注意:文件夹命名建议用英文或拼音(如 my_monster),避免中文路径。
+
+二、最小要求:什么才算一个怪兽
+------------------------------
+
+满足下面任一条件的文件夹,重启程序后就会被自动识别:
+
+1. 文件夹里有 "走路动效_spritesheet*.png" 或 "walk_spritesheet*.png"
+   (完整怪兽,素材齐全)
+2. 文件夹里有 config.jsonc / config.json(染色变体,素材自动回退到第一个完整怪兽)
+
+三、素材规格
+------------
+
+- spritesheet 是 5 列 × 3 行(共 15 帧)的网格拼图:
+  顺序 = 第 1 行从左到右 → 第 2 行 → 第 3 行
+- 推荐 PNG 透明底;同时存在 "xxx.png" 和 "xxx_transparent.png" 时,
+  优先用 _transparent 版本
+- 共需要 6 个动画,默认文件名如下(可以在 config.json 里换名):
+
+    走路     走路动效_spritesheet.png   /  walk_spritesheet.png
+    指点     指着文件_spritesheet.png   /  point_spritesheet.png
+    踢踹     踹文件动效_spritesheet.png /  kick_spritesheet.png
+    爆炸     爆炸_spritesheet.png       /  explosion_spritesheet.png
+    雷欧登场 雷欧登场_spritesheet.png   /  leo_spritesheet.png
+    飞离     出场飞行动效_spritesheet.png / fly_spritesheet.png
+
+- 指点动画默认只取第 12~15 帧(索引 11~14,即第 3 行第 2~5 格)
+- 爆炸时机:踢踹动画的第 6 帧(索引 5)
+
+四、音频(可选)
+--------------
+
+把音频放进 <你的怪兽>/audio/ 下,文件名与默认一致即可自动生效:
+
+    bgm(1).mp3      背景乐(循环播放)
+    怪兽说话.mp3    指点文件时的音效
+    爆炸.MP4        爆炸音效
+
+不放音频 → 自动用 assets/audio/ 里的默认音频。
+想换文件名,就在 config.json 的 audio 段写明路径(见第五节)。
+
+五、config.jsonc 说明
+--------------------
+
+配置文件名两种扩展名都认:.jsonc(可带注释,编辑器不报红线,推荐)优先,
+.json(严格 JSON,不带注释)兜底。新建怪兽时,把
+assets/dajiang_monster/config.jsonc 复制到自己的文件夹里再改即可——
+只改关心的字段,其余保持原样也不会出错。
+
+config.jsonc 支持注释:"//" 开头是行注释,"/* */" 是块注释(字符串里的
+会原样保留)。模板里每个字段都带中文说明,直接看文件就能明白。
+
+所有字段都可省略,省略项自动用默认值。完整示例:
+
+{
+  "id": "my_monster",                 // 唯一标识;改文件夹名不影响已保存的默认角色
+  "name": "我的怪兽",                  // 显示名;缺省用文件夹名
+  "description": "随便写点介绍",
+
+  "sprites": {
+    "walk": "我的走路.png",            // 各动画的文件名
+    "point": "我的指点.png",
+    "kick": "我的踢踹.png",
+    "explosion": "我的爆炸.png",
+    "leo": "我的登场.png",
+    "fly": "我的飞离.png",
+    "point_frames": [11, 12, 13, 14]   // 指点动画取哪几帧(从 0 数起)
+  },
+
+  "audio": {
+    "bgm": "audio/我的背景乐.mp3",
+    "voice": "audio/我的说话.mp3",
+    "explosion": "audio/我的爆炸.mp3"
+  },
+
+  "texts": {
+    "targeting": "请选择你要摧毁的文件",   // 狙击时的提示文字
+    "dialog": "喂，是这个吗？",            // 对话气泡文字
+    "choice_yes": "是的",                  // 确认按钮
+    "choice_no": "嘤嘤嘤就是这个",         // 再挑一个按钮
+    "swap": "换一只"
+  },
+
+  "animation": {
+    "fps": 8,                  // 动画帧率
+    "sprite_height": 250,      // 怪兽显示高度(像素)
+    "walk_duration_ms": 4500,  // 走路入场时长(毫秒)
+    "explosion_height": 150,   // 爆炸图显示高度(像素)
+    "walk_y_offset": 50,       // 走路时怪兽相对目标点的垂直偏移(像素,正=偏下)
+    "target_gap": 30,          // 怪兽手指与目标文件的水平间距(像素,越小越贴近)
+    "kick_frame": 5,           // 踢踹动画第几帧触发爆炸(0 起,默认 5=第 6 帧)
+    "fly_duration_ms": 2000,   // 飞离动画时长(毫秒)
+    "explosion_y_offset": 40   // 爆炸图相对目标点上移量(像素)
+  },
+
+  "tint": { "color": "#ff0000", "strength": 0.6 }
+}
+
+六、染色变体:不动图换皮
+----------------------
+
+文件夹里只放一个 config.json,不复制任何图片,素材自动回退到
+dajiang_monster(第一个完整怪兽)。只需上色:
+
+{
+  "id": "gold_monster",
+  "name": "黄金怪兽",
+  "description": "土豪金",
+  "tint": { "color": "#ffd700", "strength": 0.7 }
+}
+
+tint.strength: 0 = 不变色,1 = 完全染成目标色。
+注:染色配合 _transparent.png(透明底)素材效果最好。
+
+七、改完怎么生效
+---------------
+
+直接重启程序即可,角色自动重新扫描,无需重新打包。
+在角色选择窗口能看到新怪兽的卡片 = 成功;
+右键召唤用的是上次选中的默认角色,记得先在角色窗口选一次。
+
+八、角色分发(打包给别的用户)
+----------------------------
+
+一个怪兽 = 一个文件夹,内容自包含(贴图 + audio/ + config.jsonc)。
+分发方法:
+1. 把 <怪兽文件夹> 压缩成 zip(右键文件夹 → 压缩)
+2. 把 zip 发给对方
+3. 对方解压后,把整个文件夹放进自己的 assets 目录
+   (点角色窗口右上角"📖 自定义角色"打开的目录),重启即用
+
+提示:右键卡片还能"编辑配置文件"(带高亮的编辑器,可改可存),方便检查和分享配置。
+

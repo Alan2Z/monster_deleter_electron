@@ -8,6 +8,11 @@
 
 右键文件/文件夹 → 召唤怪兽 → 怪兽走进来确认 → 一脚踢飞 → 目标进回收站。一款充满恶趣味的"文件删除助手"。
 
+## 🔗 项目链接
+
+- **GitHub**:https://github.com/Alan2Z/monster_deleter_electron(推荐,发布产物在此下载)
+- **Gitee**:https://gitee.com/Alan-Zou/monster_deleter_electron(⚠️ 安装包产物过大,无法上传至 Gitee,请移步至 GitHub 下载)
+
 ## ✨ 功能
 
 - **右键召唤**:在任意文件或文件夹上右键 → "召唤××怪兽摧毁" → 怪兽演出开始

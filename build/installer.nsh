@@ -26,7 +26,8 @@
 !macroend
 
 !macro customUnInstall
-  ; 只清右键菜单注册表;InstallLocation("记住的安装位置")是用户的选择,
-  ; 保留它,重装时自动沿用上次目录
+  ; 只清右键菜单注册表(文件 * + 文件夹 Directory);InstallLocation("记住的
+  ; 安装位置")是用户的选择,保留它,重装时自动沿用上次目录
   DeleteRegKey HKCU "Software\Classes\*\shell\SummonMonster"
+  DeleteRegKey HKCU "Software\Classes\Directory\shell\SummonMonster"
 !macroend

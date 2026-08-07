@@ -13,12 +13,16 @@ app.setAppUserModelId('com.example.monsterdeleter');                          //
 // 去掉窗口自带的 File/Edit/View/Window 默认菜单栏
 Menu.setApplicationMenu(null);
 
-const MENU_KEY = 'HKCU\\Software\\Classes\\*\\shell\\SummonMonster';
+// 两个注册位置:* = 所有文件;Directory = 文件夹(原版只支持文件,这里补上文件夹)
+const MENU_KEYS = [
+  'HKCU\\Software\\Classes\\*\\shell\\SummonMonster',
+  'HKCU\\Software\\Classes\\Directory\\shell\\SummonMonster',
+];
 
 // ---------- 右键菜单注册(只在打包后执行) ----------
 // 结构要和原版一致:
-//   HKCU\Software\Classes\*\shell\SummonMonster          默认值=菜单显示名,Icon=图标
-//   HKCU\Software\Classes\*\shell\SummonMonster\command  默认值="{exe}" "%1"
+//   ...\shell\SummonMonster          默认值=菜单显示名,Icon=图标
+//   ...\shell\SummonMonster\command  默认值="{exe}" "%1"
 // portable 目标下 process.execPath 指向临时解压目录,必须用 PORTABLE_EXECUTABLE_FILE
 // 先删后写:清掉旧版本(含 Python 版)留下的孤儿子键,保证每次都是干净注册
 // 菜单显示名跟随当前默认角色(用户换角色后同步更新)
@@ -34,20 +38,25 @@ function registerContextMenu() {
   const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
   const cmd = `"${exe}" "%1"`;
   const reg = (args) => execFile('reg', ['add', ...args], () => {});
-  execFile('reg', ['delete', MENU_KEY, '/f'], () => {
-    reg([MENU_KEY, '/ve', '/d', contextMenuLabel(), '/f']);
-    reg([MENU_KEY, '/v', 'Icon', '/d', `"${exe}",0`, '/f']);
-    reg([`${MENU_KEY}\\command`, '/ve', '/d', cmd, '/f']);
-  });
+  for (const key of MENU_KEYS) {
+    execFile('reg', ['delete', key, '/f'], () => {
+      reg([key, '/ve', '/d', contextMenuLabel(), '/f']);
+      reg([key, '/v', 'Icon', '/d', `"${exe}",0`, '/f']);
+      reg([`${key}\\command`, '/ve', '/d', cmd, '/f']);
+    });
+  }
 }
 
 // ---------- 启动模式 ----------
-// 从 argv 里找被召唤的文件:必须是存在的【文件】(排除 exe 自身、目录、命令行开关)
+// 从 argv 里找被召唤的目标:必须是存在的【文件或文件夹】(排除 exe 自身、命令行开关)
 const SELF = [process.execPath, process.env.PORTABLE_EXECUTABLE_FILE].filter(Boolean);
 function findTargetFile(argv) {
   return argv.find((a) => {
     if (!a || a.startsWith('-') || SELF.includes(a)) return false;
-    try { return fs.statSync(a).isFile(); } catch { return false; }
+    try {
+      const st = fs.statSync(a);
+      return st.isFile() || st.isDirectory();
+    } catch { return false; }
   });
 }
 
@@ -74,6 +83,21 @@ app.on('window-all-closed', () => {
   // 换角模式:角色窗口关了但演出窗口还活着,不能退
   if (!showWin || showWin.isDestroyed()) app.quit();
 });
+
+// ---------- 临时钩子(仅 --md-test,验证文件夹召唤后删除) ----------
+if (process.argv.includes('--md-test')) {
+  setTimeout(async () => {
+    if (showWin && !showWin.isDestroyed()) {
+      showWin.webContents.setAudioMuted(true);
+      // 等演出到对话,点"是的"触发踢踹→爆炸→删除
+      setTimeout(async () => {
+        await showWin.webContents.executeJavaScript("document.getElementById('btn-yes').click()");
+        console.log('[TEST] 已点击确认按钮');
+      }, 8000);
+    }
+    setTimeout(() => { console.log('[TEST] done'); app.quit(); }, 15000);
+  }, 3000);
+}
 
 // ---------- 角色选择窗口 ----------
 function openCharacterWindow(swapMode = false) {
@@ -190,8 +214,11 @@ ipcMain.handle('save-last-character', (e, id) => characters.saveLastCharacter(id
 // 换角色后同步右键菜单显示名(只在打包版生效,dev 不注册菜单)
 ipcMain.handle('update-context-menu-name', (e, name) => {
   if (!app.isPackaged) return null;
-  execFile('reg', ['add', MENU_KEY, '/ve', '/d', `召唤${name}摧毁`, '/f'], () => {});
-  return `召唤${name}摧毁`;
+  const label = `召唤${name}摧毁`;
+  for (const key of MENU_KEYS) {
+    execFile('reg', ['add', key, '/ve', '/d', label, '/f'], () => {});
+  }
+  return label;
 });
 ipcMain.handle('trash-file', (e, file) => {   // 回收站(文件已不存在则跳过,同原版 exists 检查)
   if (!file || !fs.existsSync(file)) return { ok: false, reason: 'not-found' };

@@ -84,21 +84,6 @@ app.on('window-all-closed', () => {
   if (!showWin || showWin.isDestroyed()) app.quit();
 });
 
-// ---------- 临时钩子(仅 --md-test,验证文件夹召唤后删除) ----------
-if (process.argv.includes('--md-test')) {
-  setTimeout(async () => {
-    if (showWin && !showWin.isDestroyed()) {
-      showWin.webContents.setAudioMuted(true);
-      // 等演出到对话,点"是的"触发踢踹→爆炸→删除
-      setTimeout(async () => {
-        await showWin.webContents.executeJavaScript("document.getElementById('btn-yes').click()");
-        console.log('[TEST] 已点击确认按钮');
-      }, 8000);
-    }
-    setTimeout(() => { console.log('[TEST] done'); app.quit(); }, 15000);
-  }, 3000);
-}
-
 // ---------- 角色选择窗口 ----------
 function openCharacterWindow(swapMode = false) {
   const win = new BrowserWindow({

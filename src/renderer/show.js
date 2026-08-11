@@ -138,24 +138,41 @@ function animateTo(anim, x0, y0, x1, y1, ms, easing, done) {
   })(t0);
 }
 
-// ---------- 瞄准遮罩(暗色 + 居中提示文字,仅手动兜底用) ----------
+// ---------- 瞄准遮罩(对应参考项目 paint_background + paintEvent) ----------
 const bgCtx = bg.getContext('2d');
 let bgAlpha = 0;
+let bgImg = null;   // 选择界面背景图(手动瞄准兜底用;缺失退化为黑色遮罩)
+
+async function loadBgImage() {
+  if (!char || !char.targetBg || bgImg) return;
+  try { bgImg = await loadImage(window.api.toFileUrl(char.targetBg)); } catch { bgImg = null; }
+  if (bgAlpha > 0.01) drawBg();   // 淡入过程中加载完,补画一帧
+}
+
+// 参考项目 paint_background:背景图等比扩大到铺满、居中,整体透明度随 bgAlpha
 function drawBg() {
   bgCtx.clearRect(0, 0, bg.width, bg.height);
-  if (bgAlpha > 0.01) {
-    bgCtx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
+  if (bgAlpha <= 0.01) return;
+  if (bgImg) {
+    bgCtx.globalAlpha = bgAlpha;   // 0 → 0.35
+    const scale = Math.max(bg.width / bgImg.naturalWidth, bg.height / bgImg.naturalHeight);
+    const w = bgImg.naturalWidth * scale, h = bgImg.naturalHeight * scale;
+    bgCtx.drawImage(bgImg, (bg.width - w) / 2, (bg.height - h) / 2, w, h);
+    bgCtx.globalAlpha = 1;
+  } else {
+    // 参考项目兜底:QColor(0,0,0,160) 再乘整体 opacity
+    bgCtx.fillStyle = `rgba(0, 0, 0, ${0.627 * bgAlpha})`;
     bgCtx.fillRect(0, 0, bg.width, bg.height);
-    // 白色加粗提示文字居中,透明度随遮罩
-    if (char) {
-      bgCtx.globalAlpha = Math.min(1, bgAlpha / 0.35);
-      bgCtx.fillStyle = '#ffffff';
-      bgCtx.font = "bold 40px 'Segoe UI', 'Microsoft YaHei', sans-serif";
-      bgCtx.textAlign = 'center';
-      bgCtx.textBaseline = 'middle';
-      bgCtx.fillText(char.texts.targeting, bg.width / 2, bg.height / 2);
-      bgCtx.globalAlpha = 1;
-    }
+  }
+  // 白色加粗提示文字居中,透明度随遮罩(参考项目 30pt bold ≈ 40px)
+  if (char) {
+    bgCtx.globalAlpha = Math.min(1, bgAlpha / 0.35);
+    bgCtx.fillStyle = '#ffffff';
+    bgCtx.font = "bold 40px 'Segoe UI', 'Microsoft YaHei', sans-serif";
+    bgCtx.textAlign = 'center';
+    bgCtx.textBaseline = 'middle';
+    bgCtx.fillText(char.texts.targeting, bg.width / 2, bg.height / 2);
+    bgCtx.globalAlpha = 1;
   }
 }
 function fadeBg(to, ms, done) {
@@ -174,6 +191,7 @@ let targetPos = null;
 let char = null;
 let targetFile = null;
 let chars = [];
+let showStarted = false;   // 开演后忽略迟到的定位/点击,防止重复开演
 
 const monsterAnim = new SpriteAnimator(monsterCv);
 const explosionAnim = new SpriteAnimator(explosionCv);
@@ -188,31 +206,38 @@ window.api.onInitShow(async (d) => {
   }
   const last = await window.api.getLastCharacter();
   char = chars.find((c) => c.id === last) || chars[0];
+  loadBgImage();   // 预加载瞄准背景图(手动兜底时用,与定位并行)
 
-  if (d.targetPos) {
-    startShowNow(d.targetPos);
-  } else if (pendingTarget) {
-    startShowNow(pendingTarget);
-  }
+  if (d.targetPos) { startShowNow(d.targetPos); return; }
+  if (pendingTarget) { startShowNow(pendingTarget); return; }
+  if (d.failed) initTargeting(char);   // 定位失败 → 手动瞄准兜底(十字准星 + 点击)
   // 否则:主进程还在定位(窗口保持透明,定位完成直接开演,无需提示)
 });
 
 // 主进程定位到文件图标后发来精确坐标(可能早于 init-show 到达,先存着)
 let pendingTarget = null;
 window.api.onAutoTarget((pos) => {
-  if (targetPos) return;
+  if (showStarted) return;
   if (!char) { pendingTarget = pos; return; }
   startShowNow(pos);
 });
 
+// 定位彻底失败:切手动瞄准,让用户自己点(不瞎猜光标位置)
+window.api.onAutoTargetFailed(() => {
+  if (!showStarted) initTargeting(char);
+});
+
 // 自动瞄准开演:直接开演(怪兽从屏幕外走进来本身就是入场)
 function startShowNow(pos) {
+  if (showStarted) return;
+  showStarted = true;
   targetPos = pos;
+  document.body.style.cursor = 'default';
   bubble.style.display = 'none';
   startShow();
 }
 
-// ---------- 狙击瞄准(对应 init_targeting_ui + paintEvent) ----------
+// ---------- 狙击瞄准(对应 init_targeting_ui + paintEvent;仅定位失败兜底用) ----------
 function initTargeting(c) {
   document.body.style.cursor = `url('data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><circle cx="20" cy="20" r="12" fill="none" stroke="red" stroke-width="2"/><path d="M20 0v8M20 32v8M0 20h8M32 20h8" stroke="red" stroke-width="2"/></svg>`
@@ -220,6 +245,8 @@ function initTargeting(c) {
   fadeBg(0.35, 800);   // 原版 fade_in:800ms → 0.35
 
   window.addEventListener('click', (e) => {   // 原版 mousePressEvent(左键)
+    if (showStarted) return;
+    showStarted = true;
     targetPos = { x: e.clientX, y: e.clientY };
     document.body.style.cursor = 'default';
     fadeBg(0, 500, startShow);   // 原版 fade_out:500ms
@@ -238,9 +265,14 @@ async function startShow() {
 
   m.setTint(char.tint.color, char.tint.strength);
   await m.loadSpritesheet(window.api.toFileUrl(char.paths.sprites.walk), 5, 3, null, h);
-  const startX = -m.w;                      // 原版 start_x = -width:整宽在屏幕外
-  const endX = targetPos.x - m.w - char.animation.target_gap;
-
+  // 目标太靠左时从右边进场:默认终点在目标左边(怪兽面向右指向文件),
+  // 若目标贴着屏幕左缘,终点会变成负坐标,怪兽整只走到屏幕外(卡在左边)。
+  // 此时镜像翻面、从右侧进场,终点在目标右边,脸朝左指着文件。
+  const gap = char.animation.target_gap;
+  const fromRight = targetPos.x - m.w - gap < 0;
+  const startX = fromRight ? innerWidth + m.w : -m.w;       // 原版 start_x = -width:整宽在屏幕外
+  const endX = fromRight ? targetPos.x + gap : targetPos.x - m.w - gap;
+  m.flip = fromRight;
   m.x = startX; m.y = y;
   m.play(char.animation.fps, true);         // 边走边播走路动画(原版 play + move 并行)
   animateTo(m, startX, y, endX, y, char.animation.walk_duration_ms, 'out-quad', async () => {

@@ -13,7 +13,7 @@ asarUnpack:          # assets 保持真实文件,渲染进程 file:// 直接读;
 win:
   target: nsis        # 安装版:启动快(免每次解压),卸载自动清注册表
   icon: public/logo.png   # 1024x1024 PNG,electron-builder 自动转 .ico
-  artifactName: MonsterDeleter-Setup.exe
+  artifactName: MonsterDeleterElectron-Setup.exe
 nsis:
   oneClick: false                    # 向导式安装(可改安装目录)
   allowToChangeInstallationDirectory: true

@@ -111,12 +111,27 @@ function findFilePosition(file) {
     const tool = app.isPackaged
       ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'find-file-rect.exe')
       : path.join(app.getAppPath(), 'build', 'find-file-rect.exe');
-    execFile(tool, [file], { timeout: 8000 }, (err, stdout) => {
-      if (err) { resolve(null); return; }
-      const m = stdout.trim().match(/^(-?\d+)\s+(-?\d+)$/);
-      resolve(m ? { x: parseInt(m[1], 10), y: parseInt(m[2], 10) } : null);   // 物理像素
+    execFile(tool, [file], { timeout: 8000 }, (err, stdout, stderr) => {
+      const m = !err ? stdout.trim().match(/^(-?\d+)\s+(-?\d+)$/) : null;
+      logFind(tool, file, err ? err.code : null, stdout, stderr, m ? 'found' : 'no-match');
+      // 工具保证输出物理像素(内部按 dpi 模式 + UIA 坐标空间自校准,见 find-file-rect.cs),
+      // 这里不再做任何坐标空间猜测。
+      resolve(m ? { x: parseInt(m[1], 10), y: parseInt(m[2], 10) } : null);
     });
   });
+}
+// 每次召唤都写一行诊断日志(%APPDATA%\monster-deleter\find-file-rect.log),
+// 含工具的 DPI 感知模式/命中通道/坐标/退出码——远程用户报"瞄不准"时靠它定位。
+// 日志上限 500KB,超出删掉重写,避免无限膨胀。
+function logFind(tool, file, exitCode, stdout, stderr, status) {
+  try {
+    const log = path.join(app.getPath('userData'), 'find-file-rect.log');
+    try { if (fs.statSync(log).size > 500 * 1024) fs.unlinkSync(log); } catch {}
+    const line = `[${new Date().toISOString()}] status=${status} exit=${exitCode ?? 'n/a'} file=${file}\n` +
+      `  stdout=${JSON.stringify((stdout || '').slice(0, 200))}\n` +
+      `  stderr=${JSON.stringify((stderr || '').slice(0, 600))}\n`;
+    fs.appendFileSync(log, line);
+  } catch (e) { console.error('write find log', e); }
 }
 
 function openShowWindow(targetFile) {
@@ -125,7 +140,8 @@ function openShowWindow(targetFile) {
   const cp = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(cp);
   const { bounds } = display;
-  let pendingPos = null;
+  let pendingPos = null;    // 工具结果早于页面加载完成时暂存
+  let pendingFail = false;  // 工具失败但页面未加载完,加载完后通知渲染端
   showWin = new BrowserWindow({
     x: bounds.x, y: bounds.y,
     width: bounds.width, height: bounds.height,
@@ -142,15 +158,21 @@ function openShowWindow(targetFile) {
   showWin.loadFile(path.join(__dirname, 'renderer', 'show.html'));
   showWin.webContents.once('did-finish-load', () => {
     // 定位若已完成则直接带上,否则渲染端先显示"定位中"
-    showWin.webContents.send('init-show', { targetFile, targetPos: pendingPos });
+    showWin.webContents.send('init-show', { targetFile, targetPos: pendingPos, failed: pendingFail });
   });
-  // 与窗口加载并行定位文件图标;失败退回光标位置(总比没有好)
+  // 与窗口加载并行定位文件图标
   findFilePosition(targetFile).then((pos) => {
     if (!showWin || showWin.isDestroyed()) return;
+    if (!pos) {
+      // 定位失败:绝不退回光标位置(光标停在右键菜单项上,必然瞄歪)。
+      // 通知渲染端切手动瞄准(十字准星 + 点击),等页面加载完再发也一样。
+      pendingFail = true;
+      if (!showWin.webContents.isLoading()) showWin.webContents.send('auto-target-failed');
+      return;
+    }
     const scale = display.scaleFactor;
-    const px = pos ? pos.x / scale : cp.x;   // 物理 → DIP
-    const py = pos ? pos.y / scale : cp.y;
-    const tp = { x: px - bounds.x, y: py - bounds.y };   // 窗口内坐标
+    // 工具保证输出物理像素(内部自校准 UIA 坐标空间,见 find-file-rect.cs),直接换算
+    const tp = { x: pos.x / scale - bounds.x, y: pos.y / scale - bounds.y };   // 物理 → DIP → 窗口内坐标
     if (showWin.webContents.isLoading()) pendingPos = tp;      // 还没加载完,交给 init-show
     else showWin.webContents.send('auto-target', tp);
   });
@@ -183,11 +205,33 @@ function ensureUserAssets() {
 const SPRITE_KEYS = ['walk', 'point', 'kick', 'explosion', 'leo', 'fly'];
 const AUDIO_KEYS = ['bgm', 'voice', 'explosion'];
 
+// 瞄准界面背景图(参考项目的"选择界面"图;手动瞄准兜底时当背景用,缺失则
+// 渲染端退化为黑色遮罩)。已装旧版的用户用户目录里没有新加的图,先查用户
+// 目录,再查程序自带资源(asar.unpacked),两个位置都能找到。
+function targetBackgroundPath() {
+  const candidates = [];
+  if (app.isPackaged) {
+    candidates.push(path.join(assetsDir(), '选择界面'));
+    candidates.push(path.join(process.resourcesPath, 'app.asar.unpacked', 'assets', '选择界面'));
+  } else {
+    candidates.push(path.join(assetsDir(), '选择界面'));
+  }
+  for (const dir of candidates) {
+    for (const n of ['选择界面.png', '选择界面.jpg', '选择界面.jpeg']) {
+      const p = path.join(dir, n);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  return null;
+}
+
 ipcMain.handle('scan-characters', () => {
+  const targetBg = targetBackgroundPath();
   return characters.scanCharacters(assetsDir()).map((c) => ({
     id: c.id, name: c.name, description: c.description,
     folder: c.folder,
     sprites: c.sprites, texts: c.texts, animation: c.animation, tint: c.tint,
+    targetBg,   // 瞄准界面背景图(手动瞄准兜底时绘制,同参考项目)
     paths: {
       sprites: Object.fromEntries(SPRITE_KEYS.map((k) => [k, c.spritePath(k)])),
       audio: Object.fromEntries(AUDIO_KEYS.map((k) => [k, c.audioPath(k)])),

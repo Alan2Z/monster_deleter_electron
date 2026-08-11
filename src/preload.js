@@ -19,5 +19,6 @@ contextBridge.exposeInMainWorld('api', {
   closeApp: () => ipcRenderer.send('show-window-close'),
   onInitShow: (cb) => ipcRenderer.on('init-show', (e, d) => cb(d)),
   onAutoTarget: (cb) => ipcRenderer.on('auto-target', (e, p) => cb(p)),
+  onAutoTargetFailed: (cb) => ipcRenderer.on('auto-target-failed', (e) => cb()),
   onSwapDone: (cb) => ipcRenderer.on('swap-done', (e, id) => cb(id)),
 });

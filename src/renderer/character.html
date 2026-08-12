@@ -19,6 +19,13 @@
     margin-bottom: 4px;
   }
   .title-row h1 { margin: 0; font-size: 26px; font-weight: 700; color: #1c1c1e; }
+  .title-row .btns { display: flex; align-items: center; gap: 10px; }
+  #uninstall-btn {
+    padding: 8px 18px; font-size: 14px; font-weight: 600;
+    border: 1px solid #d1d1d6; border-radius: 12px; background: #fff; color: #48484a;
+    cursor: pointer; white-space: nowrap;
+  }
+  #uninstall-btn:hover { background: #f2f2f7; }
   #custom-btn {
     padding: 8px 18px; font-size: 14px; font-weight: 600;
     border: none; border-radius: 12px; background: #ff7a00; color: #fff; cursor: pointer;
@@ -27,6 +34,16 @@
   #custom-btn:hover { background: #ff9500; }
   .hint { margin: 0 0 12px; color: #6c6c70; font-size: 13px; }
   #status { min-height: 18px; margin: 0 0 12px; color: #007aff; font-size: 14px; font-weight: 600; }
+  #manual-box {
+    background: #fff7e8; border: 1px solid #ffd9a3; border-radius: 12px;
+    padding: 10px 14px; margin-bottom: 12px; font-size: 13px; color: #8a5a00;
+  }
+  #manual-box label {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 14px; cursor: pointer; margin-bottom: 4px;
+  }
+  #manual-box input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  #manual-note { margin: 0; line-height: 1.5; }
   #cards {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
     max-height: 400px; overflow-y: auto;
@@ -90,14 +107,32 @@
     border: none; border-radius: 10px; background: #ff7a00; color: #fff; cursor: pointer;
   }
   #config-save:hover { background: #ff9500; }
+  #uninstall-modal {
+    position: fixed; inset: 0; display: none; z-index: 300;
+    background: rgba(0, 0, 0, .4); align-items: center; justify-content: center;
+  }
+  #uninstall-modal .modal-box {
+    background: #fff; border-radius: 14px; width: 460px; max-width: 92vw;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #uninstall-modal .modal-body {
+    padding: 18px 22px 22px; font-size: 14px; line-height: 1.8; color: #1c1c1e;
+  }
 </style>
 </head>
 <body>
   <div class="title-row">
     <h1>选择你的怪兽</h1>
-    <button id="custom-btn">📖 自定义角色</button>
+    <div class="btns">
+      <button id="uninstall-btn">🗑 如何卸载</button>
+      <button id="custom-btn">📖 自定义角色</button>
+    </div>
   </div>
   <p class="hint">双击 exe 启动时在此切换默认角色;右键菜单召唤怪兽时,将自动使用下方高亮的角色。</p>
+  <div id="manual-box">
+    <label><input type="checkbox" id="manual-toggle"><span>桌面手动定位</span></label>
+    <p id="manual-note">由于不同电脑的分辨率、缩放比例、字符编码以及桌面整理软件等因素的影响,桌面上的文件自动定位可能不准确。如遇到桌面上文件定位不准确,可勾选此项:召唤时不再自动瞄准,屏幕出现红色十字准星后,点击文件位置即可。</p>
+  </div>
   <p id="status"></p>
   <div id="cards"></div>
   <div id="empty">assets 文件夹里没有找到角色素材,请把怪兽文件夹放进去后重启。</div>
@@ -114,6 +149,15 @@
       <div class="modal-foot">
         <span id="config-err"></span>
         <button id="config-save">💾 保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="uninstall-modal">
+    <div class="modal-box">
+      <div class="modal-head"><span>如何卸载</span><button id="uninstall-close">✕</button></div>
+      <div class="modal-body">
+        在桌面上找到「召唤怪兽摧毁文件」的图标,右键点击「打开文件所在的位置」,然后找到 <b>Uninstall</b> 开头的文件,双击即可卸载。
       </div>
     </div>
   </div>

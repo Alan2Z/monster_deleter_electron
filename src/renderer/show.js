@@ -140,8 +140,9 @@ function animateTo(anim, x0, y0, x1, y1, ms, easing, done) {
 
 // ---------- 瞄准遮罩(对应参考项目 paint_background + paintEvent) ----------
 const bgCtx = bg.getContext('2d');
-let bgAlpha = 0;
-let bgImg = null;   // 选择界面背景图(手动瞄准兜底用;缺失退化为黑色遮罩)
+let bgAlpha = 0;            // 当前淡入进度(0 → bgOpacity)
+let bgOpacity = 0.35;       // 背景图目标不透明度,来自角色 config 的 targeting.bg_opacity
+let bgImg = null;           // 本角色 targeting_bg.png(缺失退化为黑色遮罩)
 
 async function loadBgImage() {
   if (!char || !char.targetBg || bgImg) return;
@@ -149,24 +150,23 @@ async function loadBgImage() {
   if (bgAlpha > 0.01) drawBg();   // 淡入过程中加载完,补画一帧
 }
 
-// 参考项目 paint_background:背景图等比扩大到铺满、居中,整体透明度随 bgAlpha
+// 背景图按【原本尺寸】居中绘制(不拉伸铺满),透明度跟随淡入到 bgOpacity;
+// 图片缺失时退化为黑色遮罩(参考项目 QColor(0,0,0,160) × opacity)
 function drawBg() {
   bgCtx.clearRect(0, 0, bg.width, bg.height);
   if (bgAlpha <= 0.01) return;
   if (bgImg) {
-    bgCtx.globalAlpha = bgAlpha;   // 0 → 0.35
-    const scale = Math.max(bg.width / bgImg.naturalWidth, bg.height / bgImg.naturalHeight);
-    const w = bgImg.naturalWidth * scale, h = bgImg.naturalHeight * scale;
+    bgCtx.globalAlpha = bgAlpha;   // 0 → bgOpacity(config 可调,默认 0.35)
+    const w = bgImg.naturalWidth, h = bgImg.naturalHeight;   // 原图尺寸,不缩放
     bgCtx.drawImage(bgImg, (bg.width - w) / 2, (bg.height - h) / 2, w, h);
     bgCtx.globalAlpha = 1;
   } else {
-    // 参考项目兜底:QColor(0,0,0,160) 再乘整体 opacity
     bgCtx.fillStyle = `rgba(0, 0, 0, ${0.627 * bgAlpha})`;
     bgCtx.fillRect(0, 0, bg.width, bg.height);
   }
   // 白色加粗提示文字居中,透明度随遮罩(参考项目 30pt bold ≈ 40px)
   if (char) {
-    bgCtx.globalAlpha = Math.min(1, bgAlpha / 0.35);
+    bgCtx.globalAlpha = Math.min(1, bgAlpha / bgOpacity);
     bgCtx.fillStyle = '#ffffff';
     bgCtx.font = "bold 40px 'Segoe UI', 'Microsoft YaHei', sans-serif";
     bgCtx.textAlign = 'center';
@@ -192,6 +192,7 @@ let char = null;
 let targetFile = null;
 let chars = [];
 let showStarted = false;   // 开演后忽略迟到的定位/点击,防止重复开演
+let manualMode = false;    // 本次召唤是否走手动瞄准(开关开启 且 目标是桌面文件)
 
 const monsterAnim = new SpriteAnimator(monsterCv);
 const explosionAnim = new SpriteAnimator(explosionCv);
@@ -206,7 +207,17 @@ window.api.onInitShow(async (d) => {
   }
   const last = await window.api.getLastCharacter();
   char = chars.find((c) => c.id === last) || chars[0];
+  const op = char.targeting && char.targeting.bg_opacity != null ? Number(char.targeting.bg_opacity) : 0.35;
+  bgOpacity = Math.min(1, Math.max(0, op));   // 瞄准背景图不透明度(config 可调,默认 0.35)
   loadBgImage();   // 预加载瞄准背景图(手动兜底时用,与定位并行)
+
+  // 手动定位开关只对桌面目标生效:桌面文件 → 直接出十字准星手动点击;
+  // 文件夹里的文件 → 照常自动定位(不受开关影响)。
+  if (await window.api.getManualTargeting() && d.onDesktop) {
+    manualMode = true;
+    initTargeting(char);
+    return;
+  }
 
   if (d.targetPos) { startShowNow(d.targetPos); return; }
   if (pendingTarget) { startShowNow(pendingTarget); return; }
@@ -217,14 +228,15 @@ window.api.onInitShow(async (d) => {
 // 主进程定位到文件图标后发来精确坐标(可能早于 init-show 到达,先存着)
 let pendingTarget = null;
 window.api.onAutoTarget((pos) => {
-  if (showStarted) return;
+  if (showStarted || manualMode) return;
   if (!char) { pendingTarget = pos; return; }
   startShowNow(pos);
 });
 
 // 定位彻底失败:切手动瞄准,让用户自己点(不瞎猜光标位置)
 window.api.onAutoTargetFailed(() => {
-  if (!showStarted) initTargeting(char);
+  if (showStarted || manualMode) return;
+  if (char) initTargeting(char);
 });
 
 // 自动瞄准开演:直接开演(怪兽从屏幕外走进来本身就是入场)
@@ -242,7 +254,7 @@ function initTargeting(c) {
   document.body.style.cursor = `url('data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><circle cx="20" cy="20" r="12" fill="none" stroke="red" stroke-width="2"/><path d="M20 0v8M20 32v8M0 20h8M32 20h8" stroke="red" stroke-width="2"/></svg>`
   )}') 20 20, crosshair`;
-  fadeBg(0.35, 800);   // 原版 fade_in:800ms → 0.35
+  fadeBg(bgOpacity, 800);   // 原版 fade_in:800ms → 配置的不透明度(默认 0.35)
 
   window.addEventListener('click', (e) => {   // 原版 mousePressEvent(左键)
     if (showStarted) return;

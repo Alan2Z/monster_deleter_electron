@@ -47,8 +47,9 @@ const DEFAULT_CHARACTER = {
     explosion_y_offset: 40,    // 爆炸图相对目标点上移量(像素)
   },
   tint: { color: '#ffffff', strength: 0 },
+  targeting: { bg_opacity: 0.35 },   // 瞄准界面背景图(targeting_bg.png)的不透明度,0~1
 };
-const MERGE_SECTIONS = ['sprites', 'audio', 'texts', 'animation', 'tint'];
+const MERGE_SECTIONS = ['sprites', 'audio', 'texts', 'animation', 'tint', 'targeting'];
 const WALK_PATTERNS = ['走路动效_spritesheet', 'walk_spritesheet'];
 
 // 支持注释的 JSON(JSONC):剥掉 // 行注释和 /* */ 块注释,字符串里的保留
@@ -149,7 +150,7 @@ function scanCharacters(assetsRoot) {
       name: m.name || path.basename(folder),
       description: m.description || `来自 "${path.basename(folder)}" 文件夹的怪兽`,
       sprites: m.sprites, audio: m.audio, texts: m.texts,
-      animation: m.animation, tint: m.tint,
+      animation: m.animation, tint: m.tint, targeting: m.targeting,
       spritePath: (key) =>
         findAsset(fallbacks, m.sprites[key]) ||
         findAsset(fallbacks, DEFAULT_CHARACTER.sprites[key]),
@@ -197,4 +198,24 @@ function loadLastCharacter() {
   return null;
 }
 
-module.exports = { scanCharacters, saveLastCharacter, loadLastCharacter };
+// ---------- 通用设置读写(与 last_character 共用 settings.json) ----------
+function loadSettings() {
+  try {
+    if (fs.existsSync(settingsPath())) {
+      return JSON.parse(fs.readFileSync(settingsPath(), 'utf-8')) || {};
+    }
+  } catch (e) { console.error('load settings', e); }
+  return {};
+}
+function saveSettings(patch) {
+  try {
+    fs.writeFileSync(settingsPath(), JSON.stringify({ ...loadSettings(), ...patch }, null, 2), 'utf-8');
+  } catch (e) { console.error('save settings', e); }
+}
+
+// 桌面手动定位开关:桌面自动定位受分辨率/缩放/编码/桌面整理软件影响,
+// 可能不准,用户可在主窗口勾选后强制改为十字准星手动点击瞄准
+function loadManualTargeting() { return !!loadSettings().manual_targeting; }
+function saveManualTargeting(v) { saveSettings({ manual_targeting: !!v }); }
+
+module.exports = { scanCharacters, saveLastCharacter, loadLastCharacter, loadManualTargeting, saveManualTargeting };

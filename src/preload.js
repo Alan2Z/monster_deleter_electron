@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('api', {
   scanCharacters: () => ipcRenderer.invoke('scan-characters'),
   getLastCharacter: () => ipcRenderer.invoke('get-last-character'),
   saveLastCharacter: (id) => ipcRenderer.invoke('save-last-character', id),
+  getManualTargeting: () => ipcRenderer.invoke('get-manual-targeting'),
+  saveManualTargeting: (v) => ipcRenderer.invoke('save-manual-targeting', v),
   updateContextMenuName: (name) => ipcRenderer.invoke('update-context-menu-name', name),
   trashFile: (f) => ipcRenderer.invoke('trash-file', f),
   openAssetsDir: () => ipcRenderer.invoke('open-assets-dir'),

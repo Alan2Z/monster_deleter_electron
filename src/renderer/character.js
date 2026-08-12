@@ -6,6 +6,11 @@ const cardsEl = document.getElementById('cards');
 const statusEl = document.getElementById('status');
 const emptyEl = document.getElementById('empty');
 const randomBtn = document.getElementById('random');
+const manualToggle = document.getElementById('manual-toggle');
+
+// 桌面手动定位开关:读取上次选择,勾选即持久化(见 show.js:手动模式下召唤直接出十字准星)
+window.api.getManualTargeting().then((v) => { manualToggle.checked = !!v; });
+manualToggle.onchange = () => window.api.saveManualTargeting(manualToggle.checked);
 
 let chars = [];
 
@@ -181,7 +186,16 @@ document.getElementById('config-save').onclick = async () => {
   }
 };
 
+// 如何卸载:弹出可关闭的说明卡片
+const uninstallModal = document.getElementById('uninstall-modal');
+document.getElementById('uninstall-btn').onclick = () => { uninstallModal.style.display = 'flex'; };
+document.getElementById('uninstall-close').onclick = () => { uninstallModal.style.display = 'none'; };
+uninstallModal.addEventListener('click', (e) => { if (e.target === uninstallModal) uninstallModal.style.display = 'none'; });
+
 // Esc:standalone 关闭窗口(应用退出);换角模式只关窗口,演出窗口继续(原版 keyPressEvent)
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') window.close();
+  if (e.key === 'Escape') {
+    if (uninstallModal.style.display === 'flex') { uninstallModal.style.display = 'none'; return; }
+    window.close();
+  }
 });

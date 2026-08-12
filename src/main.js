@@ -134,6 +134,17 @@ function logFind(tool, file, exitCode, stdout, stderr, status) {
   } catch (e) { console.error('write find log', e); }
 }
 
+// 目标是否在桌面上(用户桌面含 OneDrive 重定向 + 公共桌面)。
+// 主窗口的"桌面手动定位"开关只对桌面目标生效,文件夹里的文件不受影响。
+function isDesktopTarget(file) {
+  try {
+    const dir = path.dirname(file).toLowerCase().replace(/\\$/, '');
+    const candidates = [app.getPath('desktop')];
+    if (process.env.PUBLIC) candidates.push(path.join(process.env.PUBLIC, 'Desktop'));
+    return candidates.some((c) => dir === c.toLowerCase().replace(/\\$/, ''));
+  } catch { return false; }
+}
+
 function openShowWindow(targetFile) {
   if (showWin && !showWin.isDestroyed()) showWin.close();   // 重复召唤时换新
   // 演出窗口开到光标所在的那块屏(右键菜单就在那)
@@ -158,7 +169,10 @@ function openShowWindow(targetFile) {
   showWin.loadFile(path.join(__dirname, 'renderer', 'show.html'));
   showWin.webContents.once('did-finish-load', () => {
     // 定位若已完成则直接带上,否则渲染端先显示"定位中"
-    showWin.webContents.send('init-show', { targetFile, targetPos: pendingPos, failed: pendingFail });
+    showWin.webContents.send('init-show', {
+      targetFile, targetPos: pendingPos, failed: pendingFail,
+      onDesktop: isDesktopTarget(targetFile),   // 桌面手动定位开关只对桌面目标生效
+    });
   });
   // 与窗口加载并行定位文件图标
   findFilePosition(targetFile).then((pos) => {
@@ -205,20 +219,17 @@ function ensureUserAssets() {
 const SPRITE_KEYS = ['walk', 'point', 'kick', 'explosion', 'leo', 'fly'];
 const AUDIO_KEYS = ['bgm', 'voice', 'explosion'];
 
-// 瞄准界面背景图(参考项目的"选择界面"图;手动瞄准兜底时当背景用,缺失则
-// 渲染端退化为黑色遮罩)。已装旧版的用户用户目录里没有新加的图,先查用户
-// 目录,再查程序自带资源(asar.unpacked),两个位置都能找到。
-function targetBackgroundPath() {
-  const candidates = [];
-  if (app.isPackaged) {
-    candidates.push(path.join(assetsDir(), '选择界面'));
-    candidates.push(path.join(process.resourcesPath, 'app.asar.unpacked', 'assets', '选择界面'));
-  } else {
-    candidates.push(path.join(assetsDir(), '选择界面'));
-  }
-  for (const dir of candidates) {
-    for (const n of ['选择界面.png', '选择界面.jpg', '选择界面.jpeg']) {
-      const p = path.join(dir, n);
+// 角色自己的瞄准背景图:文件夹下 targeting_bg.{png,jpg,jpeg}(可选,缺失渲染端
+// 退化为黑色遮罩)。已装旧版的用户目录里没有新文件,先查用户目录,再查程序自带
+// 资源(app.asar.unpacked),两个位置都能命中。
+function targetingBgFor(folder) {
+  const roots = app.isPackaged
+    ? [assetsDir(), path.join(process.resourcesPath, 'app.asar.unpacked', 'assets')]
+    : [assetsDir()];
+  const rel = path.basename(folder);
+  for (const root of roots) {
+    for (const n of ['targeting_bg.png', 'targeting_bg.jpg', 'targeting_bg.jpeg']) {
+      const p = path.join(root, rel, n);
       if (fs.existsSync(p)) return p;
     }
   }
@@ -226,12 +237,12 @@ function targetBackgroundPath() {
 }
 
 ipcMain.handle('scan-characters', () => {
-  const targetBg = targetBackgroundPath();
   return characters.scanCharacters(assetsDir()).map((c) => ({
     id: c.id, name: c.name, description: c.description,
     folder: c.folder,
     sprites: c.sprites, texts: c.texts, animation: c.animation, tint: c.tint,
-    targetBg,   // 瞄准界面背景图(手动瞄准兜底时绘制,同参考项目)
+    targeting: c.targeting,
+    targetBg: targetingBgFor(c.folder),   // 本角色瞄准背景图(手动定位时绘制,原尺寸居中)
     paths: {
       sprites: Object.fromEntries(SPRITE_KEYS.map((k) => [k, c.spritePath(k)])),
       audio: Object.fromEntries(AUDIO_KEYS.map((k) => [k, c.audioPath(k)])),
@@ -240,6 +251,8 @@ ipcMain.handle('scan-characters', () => {
 });
 ipcMain.handle('get-last-character', () => characters.loadLastCharacter());
 ipcMain.handle('save-last-character', (e, id) => characters.saveLastCharacter(id));
+ipcMain.handle('get-manual-targeting', () => characters.loadManualTargeting());
+ipcMain.handle('save-manual-targeting', (e, v) => characters.saveManualTargeting(v));
 // 换角色后同步右键菜单显示名(只在打包版生效,dev 不注册菜单)
 ipcMain.handle('update-context-menu-name', (e, name) => {
   if (!app.isPackaged) return null;
